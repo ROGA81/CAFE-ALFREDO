@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Tickets - Exportación de Café</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      background-color: #f4f1ed;
+      color: #3e3e3e;
+    }
+    .bg-nature {
+      background-color: #6c584c;
+      color: #fff;
+    }
+    .ticket-card {
+      border-left: 5px solid #6c584c;
+    }
+    .top-bar {
+      background-color: #6c584c;
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="top-bar" class="top-bar">
+    <span><strong>Gestión de Tickets</strong></span>
+    <button class="btn btn-light btn-sm" id="btn-logout">
+      <i class="fa fa-sign-out-alt"></i> Cerrar Sesión
+    </button>
+  </div>
+
+  <div class="container py-4">
+    <h1 class="text-center mb-4">Gestión de Tickets - Café Exportación</h1>
+
+    <!-- Login/Registro -->
+    <div id="auth-section">
+      <div class="card p-4 mb-4">
+        <h4>Inicio de Sesión</h4>
+        <input type="email" id="email" class="form-control mb-2" placeholder="Correo">
+        <input type="password" id="password" class="form-control mb-2" placeholder="Contraseña">
+        <button class="btn btn-success w-100 mb-2" id="btn-login">Iniciar Sesión</button>
+        <button class="btn btn-outline-primary w-100 mb-2" id="btn-register">Registrarse</button>
+        <button class="btn btn-outline-secondary w-100" id="btn-reset">Recuperar Contraseña</button>
+      </div>
+    </div>
+
+    <!-- Gestión de Tickets -->
+    <div id="main-section" style="display:none">
+      <div class="card p-4 mb-4">
+        <h4>Crear Ticket</h4>
+        <input type="text" id="titulo" class="form-control mb-2" placeholder="Título">
+        <textarea id="descripcion" class="form-control mb-2" placeholder="Descripción"></textarea>
+        <select id="prioridad" class="form-select mb-2">
+          <option value="Alta">Alta</option>
+          <option value="Media">Media</option>
+          <option value="Baja">Baja</option>
+        </select>
+        <input type="text" id="cliente" class="form-control mb-2" placeholder="Nombre del Cliente">
+        <input type="number" id="kilogramos" class="form-control mb-2" placeholder="Kilogramos">
+        <input type="number" id="precioPorKg" class="form-control mb-2" placeholder="Precio por Kg">
+        <input type="text" id="producto" class="form-control mb-2" placeholder="Tipo de Producto">
+        <input type="text" id="pais" class="form-control mb-2" placeholder="País de Destino">
+        <input type="number" id="precioTotal" class="form-control mb-2" placeholder="Precio Total" readonly>
+        <button class="btn btn-primary w-100" id="btn-crear">Crear Ticket</button>
+      </div>
+
+      <h4>Tickets Registrados</h4>
+      <div id="ticket-list" class="row g-3 mb-4"></div>
+
+      <button class="btn btn-success mb-4" id="btn-exportar">
+        <i class="fa-solid fa-file-excel"></i> Exportar Todo a Excel
+      </button>
+
+      <h4>Estadísticas</h4>
+      <canvas id="graficoPrioridad"></canvas>
+    </div>
+  </div>
+
+  <!-- Firebase y Scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBe9fsiH4Abod_bNF3npr-XQRRIqn-YbYo",
+      authDomain: "cafe-alfredo-84ae0.firebaseapp.com",
+      projectId: "cafe-alfredo-84ae0",
+      storageBucket: "cafe-alfredo-84ae0.appspot.com",
+      messagingSenderId: "239672970833",
+      appId: "1:239672970833:web:298103ea9abf1277237270"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth();
+    const db = getFirestore();
+
+    document.getElementById("kilogramos").addEventListener("input", calcularPrecioTotal);
+    document.getElementById("precioPorKg").addEventListener("input", calcularPrecioTotal);
+
+    function calcularPrecioTotal() {
+      const kg = parseFloat(document.getElementById("kilogramos").value) || 0;
+      const precioKg = parseFloat(document.getElementById("precioPorKg").value) || 0;
+      document.getElementById("precioTotal").value = (kg * precioKg).toFixed(2);
+    }
+
+    document.getElementById("btn-login").addEventListener("click", async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (error) {
+        alert("Error de inicio de sesión: " + error.message);
+      }
+    });
+
+    document.getElementById("btn-register").addEventListener("click", async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+        alert("Usuario registrado correctamente.");
+      } catch (error) {
+        alert("Error al registrar: " + error.message);
+      }
+    });
+
+    document.getElementById("btn-reset").addEventListener("click", async () => {
+      const email = document.getElementById("email").value;
+      try {
+        await sendPasswordResetEmail(auth, email);
+        alert("Correo de recuperación enviado.");
+      } catch (error) {
+        alert("Error al enviar recuperación: " + error.message);
+      }
+    });
+
+    document.getElementById("btn-logout").addEventListener("click", async () => {
+      await signOut(auth);
+      document.getElementById("auth-section").style.display = "block";
+      document.getElementById("main-section").style.display = "none";
+      document.getElementById("top-bar").style.display = "none";
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        document.getElementById("auth-section").style.display = "none";
+        document.getElementById("main-section").style.display = "block";
+        document.getElementById("top-bar").style.display = "flex";
+        cargarTickets();
+      }
+    });
+
+    // ... el resto del código no se modifica ...
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+
+</html>
